@@ -1342,7 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Promise.race to timeout if Firestore hangs (e.g. database not created in console)
                     const docRef = await Promise.race([
                         db.collection('transfers').add(payload),
-                        new Promise((_, reject) => setTimeout(() => reject(new Error("Database connection timed out. Please ensure Firestore Database is created in Firebase Console.")), 5000))
+                        new Promise((_, reject) => setTimeout(() => reject(new Error("Database connection timed out. Please ensure Firestore Database is created in Firebase Console.")), 15000))
                     ]);
                     transferId = docRef.id;
                 } catch (dbError) {

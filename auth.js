@@ -159,6 +159,7 @@ if (firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE") {
     auth = firebase.auth();
     db = firebase.firestore();
     window.db = db;
+    window.auth = auth;
 } else {
     console.warn("Firebase is not configured! Authentication will run in 'Mock Mode' for preview purposes only.");
 }

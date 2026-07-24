@@ -352,6 +352,9 @@ body {
     isolation: isolate;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(224, 223, 250, 0.35) 100%);
     border: 1px solid rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
 }
 
 .navbar-content {

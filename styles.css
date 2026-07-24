@@ -1459,12 +1459,18 @@ body.theme-neo-brutalism #recovery-dashboard > .glass-panel {
     position: absolute;
     top: -4px;
     right: -4px;
-    background-color: #ff3b30;
+    background: linear-gradient(135deg, #ff416c, #ff4b2b);
     color: white;
-    font-size: 0.75rem;
-    font-weight: bold;
+    font-size: 0.7rem;
+    font-weight: 800;
     width: 20px;
     height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 4px rgba(255, 65, 108, 0.4);
     z-index: 10;
 }
 

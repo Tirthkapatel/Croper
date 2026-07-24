@@ -244,6 +244,12 @@ if (mainForgotPassword) {
 // Helper function for professional error messages
 function getFriendlyErrorMessage(error) {
     let msg = '';
+    
+    // Check if the error message is a raw JSON string from Identity Platform
+    if (error.message && typeof error.message === 'string' && error.message.includes('INVALID_LOGIN_CREDENTIALS')) {
+        return '❌ Invalid login credentials. Please check your email and password.';
+    }
+
     switch (error.code) {
         case 'auth/popup-closed-by-user':
             msg = 'Login was cancelled. Please try again.'; break;
@@ -262,9 +268,14 @@ function getFriendlyErrorMessage(error) {
         case 'auth/network-request-failed':
             msg = 'Network error. Please check your internet connection.'; break;
         case 'auth/invalid-credential':
+        case 'auth/invalid-login-credentials':
             msg = 'Invalid login credentials. Please check your email and password.'; break;
         default:
-            msg = error.message || 'An unexpected error occurred. Please try again later.';
+            msg = 'An unexpected error occurred. Please try again later.';
+            // Fallback for raw JSON if we didn't catch it
+            if (error.message && !error.message.includes('{')) {
+                msg = error.message;
+            }
     }
     return '❌ ' + msg;
 }

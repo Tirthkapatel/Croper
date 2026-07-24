@@ -1304,6 +1304,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (Object.keys(inventory).length === 0) {
+            transferError.innerText = "❌ Your inventory is empty. Nothing to transfer!";
+            transferError.classList.remove('hidden');
+            return;
+        }
+
         transferError.classList.add('hidden');
         transferConfirmBtn.innerText = "Verifying email...";
         transferConfirmBtn.disabled = true;

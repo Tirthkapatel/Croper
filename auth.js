@@ -495,7 +495,19 @@ function showAppUI(email) {
     }
     
     navbar.classList.remove('hidden');
-    userEmailSpan.innerText = email;
+    // Smart email display: show short version on mobile, full on tooltip
+    const atIndex = email.indexOf('@');
+    const username = atIndex > -1 ? email.substring(0, atIndex) : email;
+    const isMobile = window.innerWidth < 480;
+    userEmailSpan.innerText = isMobile ? username : email;
+    userEmailSpan.title = email; // Full email visible on hover/long-press (native tooltip)
+    // Update on resize
+    const _updateEmailDisplay = () => {
+        userEmailSpan.innerText = window.innerWidth < 480 ? username : email;
+    };
+    window.removeEventListener('resize', window._navEmailResize);
+    window._navEmailResize = _updateEmailDisplay;
+    window.addEventListener('resize', window._navEmailResize);
     
     // Populate Settings Info
     const settingsEmail = document.getElementById('settings-user-email');

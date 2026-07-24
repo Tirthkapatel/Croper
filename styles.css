@@ -366,6 +366,8 @@ body {
     justify-content: space-between;
     padding: 0 24px;
     box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .glass-backdrop {
@@ -376,11 +378,22 @@ body {
     overflow: hidden;
 }
 
-.nav-left, .nav-right {
+.nav-left {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
     z-index: 2;
+    min-width: 0;
+    flex-shrink: 1;
+    overflow: hidden;
+}
+
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 2;
+    flex-shrink: 0; /* Right side (actions) must not shrink */
 }
 
 .hamburger {
@@ -410,12 +423,23 @@ body {
     letter-spacing: -0.5px;
     margin: 0;
     padding-left: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 .user-email {
     color: #334155;
     font-size: 0.95rem;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+    min-width: 0;
+    cursor: default;
+    /* Tooltip via title attribute, styled natively */
 }
 
 .logout-btn {
@@ -1748,7 +1772,7 @@ body.theme-neo-brutalism .toast-message {
         width: calc(100% - 20px) !important;
         border-radius: 16px !important;
         top: 10px !important;
-        padding: 0 8px !important;
+        padding: 0 !important;
         position: fixed !important;
         left: 0 !important;
         right: 0 !important;
@@ -1763,34 +1787,48 @@ body.theme-neo-brutalism .toast-message {
         border-radius: 16px !important;
     }
 
+    .navbar-content {
+        padding: 0 10px !important;
+        gap: 6px !important;
+    }
+
     .nav-logo {
-        font-size: clamp(0.85rem, 3.5vw, 1.1rem) !important; /* Scale down logo on tiny screens */
+        font-size: 0.95rem !important;
         white-space: nowrap !important;
         line-height: 1.1 !important;
+        padding-left: 4px !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        /* On small screens, abbreviate to just 'Cropper' via data attribute */
+        max-width: 90px !important;
     }
     
     .nav-left {
         gap: 4px !important;
-        min-width: 0;
+        min-width: 0 !important;
+        flex: 1 1 0 !important;  /* Allow it to grow AND shrink */
+        overflow: hidden !important;
     }
 
     .nav-right {
-        gap: 4px !important; /* Override inline 15px gap */
-        min-width: 0;
+        gap: 6px !important;
+        flex-shrink: 0 !important;
     }
 
     .logout-btn {
-        padding: 5px 8px !important;
-        font-size: 0.7rem !important;
+        padding: 5px 10px !important;
+        font-size: 0.72rem !important;
+        white-space: nowrap !important;
     }
 
     .user-email {
         display: block !important;
-        max-width: 65px; /* Extremely constrained for tiny screens */
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-size: 0.7rem;
+        max-width: 80px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        font-size: 0.72rem !important;
     }
 
     /* Fix the Dashboard/App Wrapper Centering */

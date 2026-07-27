@@ -35,7 +35,7 @@ function injectCustomModals() {
 injectCustomModals();
 
 // Custom UI Functions
-window.showToast = function(message, type = 'success') {
+window.showToast = function(message, type = 'success', duration = 3000) {
     const container = document.getElementById('toast-container');
     if (!container) return;
     
@@ -58,7 +58,7 @@ window.showToast = function(message, type = 'success') {
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
-    }, 4000);
+    }, duration);
 };
 
 // Global Error Handlers (Zero Silent Failures)
@@ -185,31 +185,72 @@ const passwordInput = document.getElementById('password');
 // State
 let isLoginMode = true;
 
-const getBtnHtml = (text) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> <span>${text}</span>`;
+const getBtnHtml = (text, state = 'default') => {
+    if (state === 'loading') {
+        return `<span class="spinner" style="display: inline-block; width: 16px; height: 16px; border: 2.5px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px;"></span> <span>${text}</span>`;
+    }
+    if (state === 'success') {
+        return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M20 6L9 17l-5-5"></path></svg> <span>${text}</span>`;
+    }
+    const icon = isLoginMode ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>` : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>`;
+    return `${icon} <span>${text}</span>`;
+};
 
-// Toggle between Login and Sign Up
+// Remove initial enter animation class after page load so future flips never blink or flash
+setTimeout(() => {
+    const authCardPanel = document.querySelector('.auth-card');
+    if (authCardPanel) authCardPanel.classList.remove('initial-card-enter');
+}, 1000);
+
+// Toggle between Login and Sign Up with 3D Flip Animation
+let isFlipping = false;
 authToggleLink.addEventListener('click', (e) => {
     e.preventDefault();
-    isLoginMode = !isLoginMode;
-    authError.classList.add('hidden');
-    
-    if (isLoginMode) {
-        authTitle.innerText = "Login";
-        authSubtitle.innerText = "Welcome back! Please login to continue.";
-        authSubmitBtn.innerHTML = getBtnHtml("Login");
-        authToggleText.innerText = "Don't have an account?";
-        authToggleLink.innerText = "Sign Up";
-        const fpLink = document.getElementById('main-forgot-password');
-        if(fpLink) fpLink.style.display = 'inline';
-    } else {
-        authTitle.innerText = "Sign Up";
-        authSubtitle.innerText = "Create an account to start saving data.";
-        authSubmitBtn.innerHTML = getBtnHtml("Sign Up");
-        authToggleText.innerText = "Known to Flipkart Cropper?";
-        authToggleLink.innerText = "Sign in to continue!";
-        const fpLink = document.getElementById('main-forgot-password');
-        if(fpLink) fpLink.style.display = 'none';
+    if (isFlipping) return;
+    isFlipping = true;
+
+    const authCard = document.querySelector('.auth-card');
+    const goingToSignUp = isLoginMode;
+
+    if (authCard) {
+        authCard.classList.remove('initial-card-enter', 'anim-flip-out-right', 'anim-flip-in-left', 'anim-flip-out-left', 'anim-flip-in-right');
+        authCard.classList.add(goingToSignUp ? 'anim-flip-out-right' : 'anim-flip-out-left');
     }
+
+    setTimeout(() => {
+        isLoginMode = !isLoginMode;
+        authError.classList.add('hidden');
+        
+        if (isLoginMode) {
+            authTitle.innerText = "Login";
+            authSubtitle.innerText = "Welcome back! Please login to continue.";
+            authSubmitBtn.innerHTML = getBtnHtml("Login");
+            authToggleText.innerText = "Don't have an account?";
+            authToggleLink.innerText = "Sign Up";
+            const fpLink = document.getElementById('main-forgot-password');
+            if(fpLink) fpLink.style.display = 'inline';
+        } else {
+            authTitle.innerText = "Sign Up";
+            authSubtitle.innerText = "Create an account to start saving data.";
+            authSubmitBtn.innerHTML = getBtnHtml("Sign Up");
+            authToggleText.innerText = "Known to Flipkart Cropper?";
+            authToggleLink.innerText = "Sign in to continue!";
+            const fpLink = document.getElementById('main-forgot-password');
+            if(fpLink) fpLink.style.display = 'none';
+        }
+
+        if (authCard) {
+            authCard.classList.remove('anim-flip-out-right', 'anim-flip-out-left');
+            authCard.classList.add(goingToSignUp ? 'anim-flip-in-left' : 'anim-flip-in-right');
+        }
+
+        setTimeout(() => {
+            if (authCard) {
+                authCard.classList.remove('anim-flip-in-left', 'anim-flip-in-right');
+            }
+            isFlipping = false;
+        }, 300);
+    }, 240);
 });
 
 // Forgot Password Logic
@@ -271,6 +312,8 @@ function getFriendlyErrorMessage(error) {
         case 'auth/invalid-credential':
         case 'auth/invalid-login-credentials':
             msg = 'Invalid login credentials. Please check your email and password.'; break;
+        case 'auth/operation-not-allowed':
+            msg = 'This sign-in method is currently disabled in your Firebase Console.'; break;
         default:
             msg = 'An unexpected error occurred. Please try again later.';
             // Fallback for raw JSON if we didn't catch it
@@ -309,22 +352,39 @@ authForm.addEventListener('submit', async (e) => {
     if (!email || !password) {
         authError.innerText = "❌ Please enter both email and password.";
         authError.classList.remove('hidden');
+        authError.classList.remove('fade-in-error');
+        void authError.offsetWidth;
+        authError.classList.add('fade-in-error');
+        
+        if (!password) {
+            passwordInput.classList.remove('shake-animation');
+            void passwordInput.offsetWidth;
+            passwordInput.classList.add('shake-animation');
+            setTimeout(() => passwordInput.classList.remove('shake-animation'), 500);
+        }
         return;
     }
 
     authError.classList.add('hidden');
     authSubmitBtn.disabled = true;
-    authSubmitBtn.innerHTML = getBtnHtml("Processing...");
+    authSubmitBtn.innerHTML = getBtnHtml("Processing...", "loading");
 
     try {
         if (!auth) {
             // MOCK MODE (If user hasn't added Firebase config yet)
             setTimeout(() => {
-                showAlert("Mock Mode", "This is a Mock Login because Firebase config is missing. To make this real, add your firebaseConfig to auth.js!", "info", () => {
-                    showAppUI(email);
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.innerHTML = getBtnHtml(isLoginMode ? "Login" : "Sign Up");
-                });
+                authSubmitBtn.innerHTML = getBtnHtml("Success!", "success");
+                authSubmitBtn.style.background = "var(--accent-success)";
+                authSubmitBtn.style.borderColor = "var(--accent-success)";
+                setTimeout(() => {
+                    showAlert("Mock Mode", "This is a Mock Login because Firebase config is missing. To make this real, add your firebaseConfig to auth.js!", "info", () => {
+                        showAppUI(email);
+                        authSubmitBtn.disabled = false;
+                        authSubmitBtn.style.background = "";
+                        authSubmitBtn.style.borderColor = "";
+                        authSubmitBtn.innerHTML = getBtnHtml(isLoginMode ? "Login" : "Sign Up");
+                    });
+                }, 600);
             }, 1000);
             return;
         }
@@ -343,11 +403,31 @@ authForm.addEventListener('submit', async (e) => {
             await auth.createUserWithEmailAndPassword(email, password);
             window.createNotification(email, "Welcome!", `Welcome to Flipkart Label Cropper! Start managing your inventory today.`, "success");
         }
+        
+        authSubmitBtn.innerHTML = getBtnHtml("Success!", "success");
+        authSubmitBtn.style.background = "var(--accent-success)";
+        authSubmitBtn.style.borderColor = "var(--accent-success)";
+        await new Promise(r => setTimeout(r, 600));
+        authSubmitBtn.disabled = false;
+        authSubmitBtn.style.background = "";
+        authSubmitBtn.style.borderColor = "";
+        authSubmitBtn.innerHTML = getBtnHtml(isLoginMode ? "Login" : "Sign Up");
     } catch (error) {
         console.error("Auth Error:", error);
         authError.innerText = getFriendlyErrorMessage(error);
         authError.classList.remove('hidden');
+        authError.classList.remove('fade-in-error');
+        void authError.offsetWidth;
+        authError.classList.add('fade-in-error');
+        
+        passwordInput.classList.remove('shake-animation');
+        void passwordInput.offsetWidth;
+        passwordInput.classList.add('shake-animation');
+        setTimeout(() => passwordInput.classList.remove('shake-animation'), 500);
+        
         authSubmitBtn.disabled = false;
+        authSubmitBtn.style.background = "";
+        authSubmitBtn.style.borderColor = "";
         authSubmitBtn.innerHTML = getBtnHtml(isLoginMode ? "Login" : "Sign Up");
     }
 });
@@ -514,13 +594,17 @@ function showAppUI(email) {
     const settingsJoinDate = document.getElementById('settings-join-date');
     if (settingsEmail) settingsEmail.innerText = email;
     if (settingsJoinDate) {
-        if (auth && auth.currentUser && auth.currentUser.metadata.creationTime) {
-            const creationTime = new Date(auth.currentUser.metadata.creationTime);
-            const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-            settingsJoinDate.innerText = creationTime.toLocaleDateString('en-US', dateOptions);
-        } else {
-            settingsJoinDate.innerText = "Just now (Mock Mode)";
-        }
+        settingsJoinDate.style.opacity = '0';
+        setTimeout(() => {
+            if (auth && auth.currentUser && auth.currentUser.metadata.creationTime) {
+                const creationTime = new Date(auth.currentUser.metadata.creationTime);
+                const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+                settingsJoinDate.innerText = creationTime.toLocaleDateString('en-US', dateOptions);
+            } else {
+                settingsJoinDate.innerText = "Just now (Mock Mode)";
+            }
+            settingsJoinDate.style.opacity = '1';
+        }, 300);
     }
     
     // Ensure 'Dashboard' sidebar item is active by default
@@ -635,16 +719,30 @@ document.getElementById('security-forgot-password')?.addEventListener('click', (
 });
 
 // Re-authenticate and execute action
-async function executeSecurityAction(credential) {
+async function executeSecurityAction(credential, btnElement) {
     if (!auth || !auth.currentUser) return;
     const user = auth.currentUser;
     const email = user.email;
     
+    const originalText = btnElement ? btnElement.innerHTML : "Confirm";
+    if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.style.opacity = '0.8';
+        btnElement.style.cursor = 'not-allowed';
+        btnElement.innerHTML = `<span style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: -2px;"></span>Processing...`;
+    }
+
     try {
         if (credential) {
             await user.reauthenticateWithCredential(credential);
         }
         
+        if (btnElement) {
+            btnElement.innerHTML = `<span style="display: inline-block; margin-right: 6px; font-size: 1.1rem;">✅</span>Confirmed!`;
+            btnElement.style.background = '#10b981';
+            await new Promise(resolve => setTimeout(resolve, 700));
+        }
+
         if (pendingSecurityAction === 'deactivate') {
             localStorage.setItem('deactivated_' + email, 'true');
             sendEmailNotification(email, "account_deactivated");
@@ -664,10 +762,18 @@ async function executeSecurityAction(credential) {
         console.error("Reauth error:", error);
         securityError.innerText = getFriendlyErrorMessage(error);
         securityError.classList.remove('hidden');
+    } finally {
+        if (btnElement) {
+            btnElement.innerHTML = originalText;
+            btnElement.disabled = false;
+            btnElement.style.opacity = '1';
+            btnElement.style.cursor = 'pointer';
+            btnElement.style.background = '';
+        }
     }
 }
 
-document.getElementById('security-confirm-btn')?.addEventListener('click', () => {
+document.getElementById('security-confirm-btn')?.addEventListener('click', (e) => {
     if (!auth || !auth.currentUser) return;
     const pwd = securityPasswordInput.value;
     if (!pwd) {
@@ -676,16 +782,17 @@ document.getElementById('security-confirm-btn')?.addEventListener('click', () =>
         return;
     }
     const credential = firebase.auth.EmailAuthProvider.credential(auth.currentUser.email, pwd);
-    executeSecurityAction(credential);
+    executeSecurityAction(credential, e.currentTarget);
 });
 
-document.getElementById('security-google-btn')?.addEventListener('click', async () => {
+document.getElementById('security-google-btn')?.addEventListener('click', async (e) => {
     if (!auth || !auth.currentUser) return;
     const provider = new firebase.auth.GoogleAuthProvider();
+    const btn = e.currentTarget;
     try {
         const result = await auth.signInWithPopup(provider);
         const credential = firebase.auth.GoogleAuthProvider.credentialFromResult(result);
-        executeSecurityAction(credential);
+        executeSecurityAction(credential, btn);
     } catch (error) {
         console.error("Google Reauth error:", error);
         if (error.code !== 'auth/popup-closed-by-user') {
@@ -811,10 +918,30 @@ function initNotificationListener(userEmail) {
     const dropdownGlassEl = document.getElementById('dropdown-glass');
     let dropdownGlassInitialized = false;
 
+    // Helper: position dropdown relative to bell icon using fixed coordinates
+    function positionDropdown() {
+        const bellRect = bellContainer.getBoundingClientRect();
+        const isMobile = window.innerWidth < 480;
+        if (isMobile) {
+            // Mobile: full-width panel just below the navbar
+            dropdown.style.top = (bellRect.bottom + 8) + 'px';
+            dropdown.style.right = '10px';
+            dropdown.style.left = '10px';
+            dropdown.style.width = 'auto';
+        } else {
+            // Desktop/tablet: anchor to bell icon right edge
+            const rightOffset = window.innerWidth - bellRect.right;
+            dropdown.style.top = (bellRect.bottom + 8) + 'px';
+            dropdown.style.right = Math.max(10, rightOffset) + 'px';
+            dropdown.style.left = 'auto';
+            dropdown.style.width = '320px';
+        }
+    }
+
     // Toggle dropdown
     bellContainer.onclick = (e) => {
-        // Toggle visibility
         if (dropdown.classList.contains('hidden')) {
+            positionDropdown();
             dropdown.classList.remove('hidden');
             dropdown.classList.remove('closing');
         } else if (!dropdown.classList.contains('closing')) {
@@ -823,10 +950,15 @@ function initNotificationListener(userEmail) {
             setTimeout(() => {
                 dropdown.classList.add('hidden');
                 dropdown.classList.remove('closing');
-            }, 400); // Wait for animation to finish
+            }, 400);
         }
     };
-}
+    
+    // Re-position on resize (e.g. rotating phone)
+    window.addEventListener('resize', () => {
+        if (!dropdown.classList.contains('hidden')) positionDropdown();
+    });
+} // end initNotificationListener
 
 function getNotificationIcon(type) {
     switch(type) {

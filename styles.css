@@ -510,6 +510,7 @@ body {
     align-items: center;
     min-height: 80vh;
     width: 100%;
+    perspective: 1200px;
 }
 
 @keyframes fadeInCard {
@@ -535,6 +536,42 @@ body {
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
 }
 
+@keyframes flipOutRight {
+    0% { transform: rotateY(0deg) scale(1); opacity: 1; }
+    100% { transform: rotateY(90deg) scale(0.94); opacity: 0; }
+}
+
+@keyframes flipInLeft {
+    0% { transform: rotateY(-90deg) scale(0.94); opacity: 0; }
+    100% { transform: rotateY(0deg) scale(1); opacity: 1; }
+}
+
+@keyframes flipOutLeft {
+    0% { transform: rotateY(0deg) scale(1); opacity: 1; }
+    100% { transform: rotateY(-90deg) scale(0.94); opacity: 0; }
+}
+
+@keyframes flipInRight {
+    0% { transform: rotateY(90deg) scale(0.94); opacity: 0; }
+    100% { transform: rotateY(0deg) scale(1); opacity: 1; }
+}
+
+.auth-card.anim-flip-out-right {
+    animation: flipOutRight 240ms cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+}
+
+.auth-card.anim-flip-in-left {
+    animation: flipInLeft 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+.auth-card.anim-flip-out-left {
+    animation: flipOutLeft 240ms cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+}
+
+.auth-card.anim-flip-in-right {
+    animation: flipInRight 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
 @keyframes fadeInError {
     from {
         opacity: 0;
@@ -550,6 +587,21 @@ body {
     animation: fadeInError 300ms ease-out both;
 }
 
+@keyframes initialSmoothEnter {
+    0% {
+        opacity: 0;
+        transform: translateY(70px) scale(0.92);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.initial-card-enter {
+    animation: initialSmoothEnter 800ms cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
 .auth-card {
     width: 100%;
     max-width: 400px;
@@ -557,7 +609,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    animation: fadeInCard 300ms ease-out both;
+    transform-style: preserve-3d;
+    will-change: transform, opacity;
 }
 
 .auth-card h2 {

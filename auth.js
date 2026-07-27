@@ -543,7 +543,7 @@ if (auth) {
             
             showAppUI(user.email);
         } else {
-            showAuthUI();
+            showLandingUI();
         }
     });
 }
@@ -575,6 +575,18 @@ function showAppUI(email) {
     }
     
     navbar.classList.remove('hidden');
+    const navLoginBtn = document.getElementById('nav-login-btn');
+    if (navLoginBtn) navLoginBtn.style.display = 'none';
+    
+    // Restore sensitive navbar elements just in case they were hidden by Landing or Privacy pages
+    const menuBtn = document.getElementById('menu-btn');
+    if(menuBtn) menuBtn.style.display = '';
+    const logoutBtn = document.getElementById('logout-btn');
+    if(logoutBtn) logoutBtn.style.display = '';
+    const bell = document.getElementById('notification-bell-container');
+    if(bell) bell.style.display = '';
+    const userEmailSpanElement = document.getElementById('user-email');
+    if(userEmailSpanElement) userEmailSpanElement.style.display = '';
     // Smart email display: show short version on mobile, full on tooltip
     const atIndex = email.indexOf('@');
     const username = atIndex > -1 ? email.substring(0, atIndex) : email;
@@ -613,7 +625,34 @@ function showAppUI(email) {
     if(links.length > 0) links[0].classList.add('active');
 }
 
-function showAuthUI() {
+function setAuthModeUI(login) {
+    isLoginMode = login;
+    authError.classList.add('hidden');
+    if (isLoginMode) {
+        authTitle.innerText = "Login";
+        authSubtitle.innerText = "Welcome back! Please login to continue.";
+        authSubmitBtn.innerHTML = getBtnHtml("Login");
+        authToggleText.innerText = "Don't have an account?";
+        authToggleLink.innerText = "Sign Up";
+        const fpLink = document.getElementById('main-forgot-password');
+        if(fpLink) fpLink.style.display = 'inline';
+    } else {
+        authTitle.innerText = "Sign Up";
+        authSubtitle.innerText = "Create an account to start saving data.";
+        authSubmitBtn.innerHTML = getBtnHtml("Sign Up");
+        authToggleText.innerText = "Known to Flipkart Cropper?";
+        authToggleLink.innerText = "Sign in to continue!";
+        const fpLink = document.getElementById('main-forgot-password');
+        if(fpLink) fpLink.style.display = 'none';
+    }
+}
+
+window.showAuthUI = function(forceSignup = null) {
+    if (forceSignup === true && isLoginMode) {
+        setAuthModeUI(false);
+    } else if (forceSignup === false && !isLoginMode) {
+        setAuthModeUI(true);
+    }
     authContainer.style.display = 'flex';
     const allDashboards = document.querySelectorAll('.app-wrapper');
     allDashboards.forEach(d => { if(d) d.classList.add('hidden'); });
@@ -628,6 +667,38 @@ function showAuthUI() {
     authSubmitBtn.disabled = false;
     authSubmitBtn.innerHTML = getBtnHtml(isLoginMode ? "Login" : "Sign Up");
     emailInput.value = '';
+}
+
+function showLandingUI() {
+    authContainer.style.display = 'none';
+    
+    const allDashboards = document.querySelectorAll('.app-wrapper');
+    allDashboards.forEach(d => { if(d) d.classList.add('hidden'); });
+    
+    // Show the landing page
+    const homeDashboard = document.getElementById('home-dashboard');
+    if (homeDashboard) homeDashboard.classList.remove('hidden');
+    
+    // Show navbar but explicitly hide app-specific elements
+    navbar.classList.remove('hidden');
+    
+    const navLoginBtn = document.getElementById('nav-login-btn');
+    if (navLoginBtn) navLoginBtn.style.display = 'inline-block';
+    
+    const menuBtn = document.getElementById('menu-btn');
+    if (menuBtn) menuBtn.style.display = 'none';
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) logoutBtn.style.display = 'none';
+    const bell = document.getElementById('notification-bell-container');
+    if (bell) bell.style.display = 'none';
+    const userEmailSpanElement = document.getElementById('user-email');
+    if (userEmailSpanElement) userEmailSpanElement.style.display = 'none';
+    
+    // Ensure side panel is closed
+    const sidePanel = document.getElementById('side-panel');
+    const sidePanelOverlay = document.getElementById('side-panel-overlay');
+    if (sidePanel) sidePanel.classList.remove('open');
+    if (sidePanelOverlay) sidePanelOverlay.classList.remove('visible');
 }
 
 // --- Recovery Screen Logic ---

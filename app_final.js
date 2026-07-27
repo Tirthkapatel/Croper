@@ -1667,11 +1667,31 @@ document.addEventListener('DOMContentLoaded', () => {
                             authContainer.classList.remove('hidden');
                             navbar.classList.add('hidden');
                             window.history.pushState(null, '', window.location.pathname);
+                            
+                            // Restore navbar elements
+                            const menuBtn = document.getElementById('menu-btn');
+                            if(menuBtn) menuBtn.style.display = '';
+                            const logoutBtn = document.getElementById('logout-btn');
+                            if(logoutBtn) logoutBtn.style.display = '';
+                            const bell = document.getElementById('notification-bell-container');
+                            if(bell) bell.style.display = '';
+                            const userEmail = document.getElementById('user-email');
+                            if(userEmail) userEmail.style.display = '';
                         };
-                        navbar.querySelector('.navbar-right').prepend(backBtn);
+                        navbar.querySelector('.nav-right').prepend(backBtn);
                     } else {
-                        document.getElementById('auth-back-btn').style.display = 'inline-block';
+                        document.getElementById('auth-back-btn').style.display = 'inline-flex';
                     }
+                    
+                    // Hide sensitive navbar elements for unauthenticated users
+                    const menuBtn = document.getElementById('menu-btn');
+                    if (menuBtn) menuBtn.style.display = 'none';
+                    const logoutBtn = document.getElementById('logout-btn');
+                    if (logoutBtn) logoutBtn.style.display = 'none';
+                    const bell = document.getElementById('notification-bell-container');
+                    if (bell) bell.style.display = 'none';
+                    const userEmail = document.getElementById('user-email');
+                    if (userEmail) userEmail.style.display = 'none';
                 }
                 
                 document.querySelectorAll('.app-wrapper').forEach(d => { if(d) d.classList.add('hidden'); });

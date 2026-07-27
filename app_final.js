@@ -1,4 +1,57 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Theme Management ---
+    function initTheme() {
+        const localTheme = localStorage.getItem('themePref');
+        const sysTheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const isDark = localTheme === 'dark' || (!localTheme && sysTheme);
+        
+        applyTheme(isDark ? 'dark' : 'light');
+
+        // Add transition class after a short delay to prevent FOUC fade
+        setTimeout(() => {
+            document.body.classList.add('theme-transition');
+        }, 100);
+
+        // Bind toggle buttons
+        const navToggle = document.getElementById('theme-toggle-btn');
+        const settingsToggle = document.getElementById('settings-theme-toggle');
+        
+        const toggleHandler = () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            applyTheme(newTheme);
+            localStorage.setItem('themePref', newTheme);
+        };
+
+        if (navToggle) navToggle.addEventListener('click', toggleHandler);
+        if (settingsToggle) settingsToggle.addEventListener('click', toggleHandler);
+    }
+
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.getElementById('theme-color-meta').setAttribute('content', '#0f172a');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+            document.getElementById('theme-color-meta').setAttribute('content', '#F8F9FB');
+        }
+        
+        // Update Icons
+        const moonIcon = document.querySelector('.moon-icon');
+        const sunIcon = document.querySelector('.sun-icon');
+        if (moonIcon && sunIcon) {
+            if (theme === 'dark') {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+            } else {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        }
+    }
+
+    initTheme();
+
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const browseBtn = document.getElementById('browse-btn');
@@ -93,16 +146,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Progress Helper ---
+    function updateProgress(percent, text, subtext) {
+        const fill = document.getElementById('progress-bar-fill');
+        const pctText = document.getElementById('progress-percent');
+        const stText = document.getElementById('status-text');
+        const stSubText = document.getElementById('status-subtext');
+        if (fill) fill.style.width = Math.min(100, Math.max(0, percent)) + '%';
+        if (pctText) pctText.innerText = Math.round(percent) + '%';
+        if (stText && text) stText.innerText = text;
+        if (stSubText && subtext) stSubText.innerText = subtext;
+    }
+
     // --- Core Logic ---
     async function handleFiles(files) {
-        const file = files[0];
-        if (file.type !== 'application/pdf') {
+        const validFiles = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+        if (validFiles.length === 0) {
             showToast("Please upload a valid PDF file.", "error");
             return;
         }
 
         dropZone.classList.add('hidden');
         statusSection.classList.remove('hidden');
+        updateProgress(0, "Preparing files...", "Waiting for processing settings...");
         
         // Show Sidebar and Skeleton Loader immediately
         const sidebar = document.getElementById('sidebar');
@@ -125,7 +191,72 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            currentInputBuffer = await file.arrayBuffer();
+            if (validFiles.length === 1) {
+                currentInputBuffer = await validFiles[0].arrayBuffer();
+            } else {
+                // Merge multiple PDFs into currentInputBuffer
+                const { PDFDocument } = PDFLib;
+                const mergedPdf = await PDFDocument.create();
+                for (const f of validFiles) {
+                    const buf = await f.arrayBuffer();
+                    const pdf = await PDFDocument.load(buf);
+                    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                    copiedPages.forEach((page) => mergedPdf.addPage(page));
+                }
+                const mergedBytes = await mergedPdf.save();
+                currentInputBuffer = mergedBytes.buffer;
+            }
+            
+            // Populate File Queue with fade-in animations
+            const queueList = document.getElementById('file-queue-list');
+            const queueSection = document.getElementById('uploaded-files-queue');
+            if (queueList && queueSection) {
+                queueSection.style.display = 'block';
+                queueList.innerHTML = '';
+                
+                validFiles.forEach((f, idx) => {
+                    const sizeKb = Math.round(f.size / 1024);
+                    const sizeStr = sizeKb > 1024 ? (sizeKb / 1024).toFixed(1) + ' MB' : sizeKb + ' KB';
+                    
+                    const item = document.createElement('div');
+                    item.className = 'file-queue-item';
+                    item.style.opacity = '0';
+                    item.style.transform = 'translateY(12px)';
+                    item.style.transition = `opacity 300ms ease ${idx * 120}ms, transform 300ms cubic-bezier(0.16, 1, 0.3, 1) ${idx * 120}ms`;
+                    item.style.background = 'var(--bg-page)';
+                    item.style.padding = '10px 12px';
+                    item.style.borderRadius = '8px';
+                    item.style.border = '1px solid var(--border-color)';
+                    item.style.display = 'flex';
+                    item.style.alignItems = 'center';
+                    item.style.justifyContent = 'space-between';
+                    item.style.gap = '12px';
+                    
+                    item.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                            <div style="width: 36px; height: 36px; border-radius: 6px; background: rgba(239, 68, 68, 0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            </div>
+                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main); overflow: hidden; text-overflow: ellipsis;">${f.name}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">${sizeStr} • PDF Document</div>
+                            </div>
+                        </div>
+                        <span style="color: var(--accent-success); font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Ready
+                        </span>
+                    `;
+                    
+                    queueList.appendChild(item);
+                    
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            item.style.opacity = '1';
+                            item.style.transform = 'translateY(0)';
+                        });
+                    });
+                });
+            }
             
             // Show Upload Modal instead of immediately processing
             const uploadModal = document.getElementById('upload-modal');
@@ -198,6 +329,26 @@ document.addEventListener('DOMContentLoaded', () => {
             statusSection.classList.add('hidden');
             resultSection.classList.remove('hidden');
             previewSection.classList.remove('hidden');
+            
+            // Trigger checkmark reflow and reveal buttons after checkmark animation completes
+            const checkContainer = document.getElementById('success-checkmark-container');
+            if (checkContainer) {
+                const svg = checkContainer.innerHTML;
+                checkContainer.innerHTML = '';
+                void checkContainer.offsetWidth;
+                checkContainer.innerHTML = svg;
+            }
+            const actionBtns = document.getElementById('result-action-buttons');
+            if (actionBtns) {
+                actionBtns.style.opacity = '0';
+                actionBtns.style.transform = 'translateY(12px)';
+                actionBtns.style.pointerEvents = 'none';
+                setTimeout(() => {
+                    actionBtns.style.opacity = '1';
+                    actionBtns.style.transform = 'translateY(0)';
+                    actionBtns.style.pointerEvents = 'auto';
+                }, 750);
+            }
         } catch (error) {
             console.error(error);
             showToast("An error occurred while processing the PDF. Please try again.", "error");
@@ -222,10 +373,12 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const loadingTask = pdfjsLib.getDocument({data: new Uint8Array(inputBuffer)});
             const pdfJsDoc = await loadingTask.promise;
+            updateProgress(5, "Analyzing document pages...", `Found ${pdfJsDoc.numPages} pages to process.`);
             
             let pendingAmazonLabelIndex = -1;
             
             for (let i = 1; i <= pdfJsDoc.numPages; i++) {
+                updateProgress(5 + (i / pdfJsDoc.numPages) * 45, "Extracting SKU & order text...", `Reading page ${i} of ${pdfJsDoc.numPages}`);
                 const page = await pdfJsDoc.getPage(i);
                 const textContent = await page.getTextContent();
                 let fullText = textContent.items.map(item => item.str).join(' ');
@@ -379,6 +532,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let processedCount = 0;
         
         const sortedKeys = Object.keys(pagesByGroup).sort();
+        const totalPagesToCrop = Object.values(pagesByGroup).reduce((acc, val) => acc + val.length, 0);
+        updateProgress(50, "Sorting labels...", "Grouping by SKU and sorting orders...");
         
         for (const groupKey of sortedKeys) {
             const pageIndices = pagesByGroup[groupKey];
@@ -484,10 +639,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 processedCount++;
+                updateProgress(50 + (processedCount / Math.max(1, totalPagesToCrop)) * 45, "Cropping shipping labels...", `Processing page ${processedCount} of ${totalPagesToCrop}`);
             }
         }
         
+        updateProgress(96, "Finalizing PDF...", "Generating download bundle...");
         processedPdfBytes = await newPdf.save();
+        updateProgress(100, "Processing Complete!", "Your cropped labels are ready.");
         
         // Update Preview
         if (previewUrl) {
@@ -580,11 +738,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     if (qtyCount === 0) {
                         qtySpan.innerText = '-';
-                        qtySpan.style.color = '#cbd5e1';
+                        qtySpan.style.color = 'var(--text-muted)';
                     } else if (qtyCount === 1 && i > 1) {
                         // User requested a tick mark instead of '1' for QTY 2, QTY 3, etc.
                         qtySpan.innerHTML = '✔';
-                        qtySpan.style.color = '#10b981'; // Green tick
+                        qtySpan.style.color = 'var(--accent-success)'; // Green tick
                         qtySpan.style.fontWeight = '700';
                     } else {
                         qtySpan.innerText = qtyCount;
@@ -612,7 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
             totalLi.style.textAlign = 'center';
             totalLi.style.marginTop = '10px';
             totalLi.style.paddingTop = '12px';
-            totalLi.style.borderTop = '2px solid rgba(0,0,0,0.1)';
+            totalLi.style.borderTop = '2px solid var(--border-strong)';
             totalLi.style.borderBottom = 'none';
             totalLi.style.fontWeight = '700';
             
@@ -630,7 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
             for(let i=1; i<=maxQty; i++) {
                 const totalQtySpan = document.createElement('span');
                 totalQtySpan.innerText = totalQtyBreakdown[i] > 0 ? totalQtyBreakdown[i] : '-';
-                totalQtySpan.style.color = totalQtyBreakdown[i] > 0 ? 'var(--text-main)' : '#cbd5e1';
+                totalQtySpan.style.color = totalQtyBreakdown[i] > 0 ? 'var(--text-main)' : 'var(--text-muted)';
                 totalLi.appendChild(totalQtySpan);
             }
             
@@ -667,6 +825,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidePanel = document.getElementById('side-panel');
     const sidePanelOverlay = document.getElementById('side-panel-overlay');
 
+    function updateNavIndicator(animate = true) {
+        const indicator = document.getElementById('side-nav-indicator');
+        const activeLink = document.querySelector('.side-panel-nav a.active');
+        const navContainer = document.querySelector('.side-panel-nav');
+        if (!indicator || !activeLink || !navContainer) return;
+        
+        const navRect = navContainer.getBoundingClientRect();
+        const linkRect = activeLink.getBoundingClientRect();
+        
+        const top = linkRect.top - navRect.top + navContainer.scrollTop;
+        const height = linkRect.height;
+        
+        if (!animate || !indicator.style.top) {
+            indicator.style.transition = 'none';
+            indicator.style.top = `${top}px`;
+            indicator.style.height = `${height}px`;
+            indicator.style.opacity = '1';
+            void indicator.offsetWidth; // force reflow
+            indicator.style.transition = ''; // restore CSS transition
+        } else {
+            indicator.style.top = `${top}px`;
+            indicator.style.height = `${height}px`;
+            indicator.style.opacity = '1';
+        }
+    }
+
+    window.updateNavIndicator = updateNavIndicator;
+    window.addEventListener('resize', () => updateNavIndicator(false));
+
     function toggleSidePanel() {
         if (!sidePanel || !sidePanelOverlay) return;
         const isOpen = sidePanel.classList.contains('open');
@@ -674,14 +861,26 @@ document.addEventListener('DOMContentLoaded', () => {
             sidePanel.classList.remove('open');
             sidePanelOverlay.classList.remove('visible');
         } else {
+            void sidePanel.offsetWidth;
+            void sidePanelOverlay.offsetWidth;
             sidePanel.classList.add('open');
             sidePanelOverlay.classList.add('visible');
+            setTimeout(() => updateNavIndicator(false), 10);
+            setTimeout(() => updateNavIndicator(false), 150);
+        }
+    }
+
+    function closeSidePanel() {
+        if (!sidePanel || !sidePanelOverlay) return;
+        if (sidePanel.classList.contains('open')) {
+            sidePanel.classList.remove('open');
+            sidePanelOverlay.classList.remove('visible');
         }
     }
 
     if (menuBtn) menuBtn.addEventListener('click', toggleSidePanel);
-    if (closeMenuBtn) closeMenuBtn.addEventListener('click', toggleSidePanel);
-    if (sidePanelOverlay) sidePanelOverlay.addEventListener('click', toggleSidePanel);
+    if (closeMenuBtn) closeMenuBtn.addEventListener('click', closeSidePanel);
+    if (sidePanelOverlay) sidePanelOverlay.addEventListener('click', closeSidePanel);
 
     // --- Inventory Management Logic ---
     let inventory = {};
@@ -689,16 +888,66 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUserEmail = 'default';
 
     let inventoryUnsubscribe = null;
+    let isDataLoading = true;
+    let inventoryResolved = false;
+    let performanceResolved = false;
+
+    function animateCountUp(element, target, duration = 800) {
+        if (!element) return;
+        let startTimestamp = null;
+        target = parseInt(target, 10);
+        if (isNaN(target)) target = 0;
+        
+        if (document.hidden || duration <= 0) {
+            element.innerText = target;
+            return;
+        }
+        
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            const easeOutProgress = progress * (2 - progress);
+            element.innerText = Math.floor(easeOutProgress * target);
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            } else {
+                element.innerText = target;
+            }
+        };
+        window.requestAnimationFrame(step);
+    }
     let performanceUnsubscribe = null;
 
+    let loadingTimer = null;
     window.loadInventoryForUser = async function(email) {
+        isDataLoading = false;
+        inventoryResolved = false;
+        performanceResolved = false;
+        
+        if (loadingTimer) clearTimeout(loadingTimer);
+        loadingTimer = setTimeout(() => {
+            if (!inventoryResolved || !performanceResolved) {
+                isDataLoading = true;
+                renderHotSellingTable();
+                renderInventoryTable();
+            }
+        }, 300);
+        
         currentUserEmail = email;
         let storageKey = 'inventory_' + email;
         let perfKey = 'performance_' + email;
         
         let loadedFromCloud = false;
 
-        // Cleanup existing listeners if switching users
+        function checkDataLoaded() {
+            if (inventoryResolved && performanceResolved) {
+                if (loadingTimer) clearTimeout(loadingTimer);
+                isDataLoading = false;
+                renderHotSellingTable();
+                renderInventoryTable();
+            }
+        }
+
         if (inventoryUnsubscribe) { inventoryUnsubscribe(); inventoryUnsubscribe = null; }
         if (performanceUnsubscribe) { performanceUnsubscribe(); performanceUnsubscribe = null; }
 
@@ -716,7 +965,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (window.db && email !== 'default') {
             try {
-                // Real-time listener for Inventory
                 inventoryUnsubscribe = window.db.collection('users').doc(email).collection('data').doc('inventory')
                     .onSnapshot((invDoc) => {
                         let cloudInv = invDoc.exists ? invDoc.data() : null;
@@ -730,7 +978,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 showToast("Live Sync Active: Data loaded securely from cloud.", "success");
                             }
                         } else {
-                            // Migrate local to cloud (Cloud is empty but local has data)
                             let localInv = getLegacyData(storageKey, 'inventory');
                             if (localInv && Object.keys(localInv).length > 0) {
                                 window.db.collection('users').doc(email).collection('data').doc('inventory').set(localInv);
@@ -738,12 +985,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                 processInventoryData({});
                             }
                         }
+                        inventoryResolved = true;
+                        checkDataLoaded();
                     }, (error) => {
                         console.error("Live Sync Error (Inventory):", error);
                         fallbackToLocal();
                     });
                 
-                // Real-time listener for Performance
                 performanceUnsubscribe = window.db.collection('users').doc(email).collection('data').doc('performance')
                     .onSnapshot((perfDoc) => {
                         let cloudPerf = perfDoc.exists ? perfDoc.data() : null;
@@ -751,20 +999,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (cloudPerf && (cloudPerf.amazon > 0 || cloudPerf.flipkart > 0 || cloudPerf.meesho > 0)) {
                             globalPerformance = cloudPerf;
                             localStorage.setItem(perfKey, JSON.stringify(globalPerformance));
-                            renderHotSellingTable();
                         } else {
-                            // Migrate local to cloud
                             let localPerf = getLegacyData(perfKey, 'performance');
                             if (!localPerf) {
-                                localPerf = JSON.parse(localStorage.getItem('globalPerformance')); // Another possible old key
+                                localPerf = JSON.parse(localStorage.getItem('globalPerformance')); 
                             }
                             if (localPerf && (localPerf.amazon > 0 || localPerf.flipkart > 0 || localPerf.meesho > 0)) {
                                 window.db.collection('users').doc(email).collection('data').doc('performance').set(localPerf);
                             } else {
                                 globalPerformance = { amazon: 0, flipkart: 0, meesho: 0 };
-                                renderHotSellingTable();
                             }
                         }
+                        performanceResolved = true;
+                        checkDataLoaded();
                     }, (error) => {
                         console.error("Live Sync Error (Performance):", error);
                     });
@@ -778,6 +1025,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function fallbackToLocal() {
+            if (loadingTimer) clearTimeout(loadingTimer);
             let rawInventory = JSON.parse(localStorage.getItem(storageKey));
             let rawPerf = JSON.parse(localStorage.getItem(perfKey));
             
@@ -788,7 +1036,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             processInventoryData(rawInventory || {});
+            
+            isDataLoading = false;
+            inventoryResolved = true;
+            performanceResolved = true;
             renderHotSellingTable();
+            renderInventoryTable();
         }
         
         function processInventoryData(rawInventory) {
@@ -802,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         dispatched: {
                             total: data.dispatched,
                             amazon: 0,
-                            flipkart: data.dispatched, // Assume existing were flipkart for fallback
+                            flipkart: data.dispatched,
                             meesho: 0
                         }
                     };
@@ -815,8 +1068,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.checkForPendingTransfers();
             }
         }
-    };
-
+    }
     const inventoryDashboard = document.getElementById('inventory-dashboard');
     const appContent = document.getElementById('app-content');
     const invSkuNameInput = document.getElementById('inv-sku-name');
@@ -828,6 +1080,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Dashboard inventory table
     const dashboardInventoryTableBody = document.getElementById('dashboard-inventory-table-body');
     const emptyDashboardInvMsg = document.getElementById('empty-dashboard-inv-msg');
+
+    // Helper: get today's date as YYYY-MM-DD in local timezone (not UTC)
+    function getTodayISO() {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    // Set date picker to today by default
+    const invSkuDateInput = document.getElementById('inv-sku-date');
+    if (invSkuDateInput && !invSkuDateInput.value) {
+        invSkuDateInput.value = getTodayISO();
+    }
 
     async function saveInventory() {
         let storageKey = 'inventory_' + currentUserEmail;
@@ -855,6 +1122,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (inventoryTableBody) inventoryTableBody.innerHTML = '';
         if (dashboardInventoryTableBody) dashboardInventoryTableBody.innerHTML = '';
         
+        if (isDataLoading) {
+            if (emptyInvMsg) emptyInvMsg.style.display = 'none';
+            if (emptyDashboardInvMsg) emptyDashboardInvMsg.style.display = 'none';
+            
+            const invSkeletonRow = `
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 14px 12px;"><div class="skeleton-loader" style="height: 18px; width: 65%; border-radius: 4px;"></div></td>
+                    <td style="padding: 14px 12px; text-align: center;"><div class="skeleton-loader" style="height: 18px; width: 36px; border-radius: 4px; margin: 0 auto;"></div></td>
+                    <td style="padding: 14px 12px; text-align: center;"><div class="skeleton-loader" style="height: 18px; width: 36px; border-radius: 4px; margin: 0 auto;"></div></td>
+                    <td style="padding: 14px 12px; text-align: center;"><div class="skeleton-loader" style="height: 18px; width: 36px; border-radius: 4px; margin: 0 auto;"></div></td>
+                    <td style="padding: 14px 12px; text-align: center;"><div class="skeleton-loader" style="height: 18px; width: 20px; border-radius: 4px; margin: 0 auto;"></div></td>
+                </tr>
+            `;
+            const dashSkeletonRow = `
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 12px;"><div class="skeleton-loader" style="height: 16px; width: 70%; border-radius: 4px;"></div></td>
+                    <td style="padding: 12px; text-align: right;"><div class="skeleton-loader" style="height: 16px; width: 30px; border-radius: 4px; margin: 0 0 0 auto;"></div></td>
+                </tr>
+            `;
+            
+            if (inventoryTableBody) inventoryTableBody.innerHTML = invSkeletonRow.repeat(5);
+            if (dashboardInventoryTableBody) dashboardInventoryTableBody.innerHTML = dashSkeletonRow.repeat(4);
+            return;
+        }
+
         const skus = Object.keys(inventory);
         if (skus.length === 0) {
             if (emptyInvMsg) emptyInvMsg.style.display = 'block';
@@ -869,26 +1161,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const remaining = data.initial - data.dispatched.total;
             
             const tr = document.createElement('tr');
-            tr.style.borderBottom = '1px solid rgba(0,0,0,0.05)';
+            tr.style.borderBottom = '1px solid var(--border-color)';
             
             // Highlight low stock (less than 10% or exactly 0)
             let remainingColor = 'var(--primary-color)'; // Default to primary color (indigo)
             let remainingWeight = '700';
             if (remaining <= 0) {
-                remainingColor = '#ef4444'; // Red
+                remainingColor = 'var(--accent-danger)'; // Red
                 remainingWeight = '700';
             } else if (remaining < data.initial * 0.2) {
-                remainingColor = '#f59e0b'; // Orange
+                remainingColor = 'var(--accent-warning)'; // Orange
                 remainingWeight = '600';
             }
 
             tr.innerHTML = `
-                <td style="padding: 12px; font-weight: 500;"><span style="color: var(--primary-color); cursor: pointer; text-decoration: underline;" onclick="showSkuHistory('${sku.replace(/'/g, "\\'")}')">${sku}</span></td>
-                <td style="padding: 12px; text-align: center;">${data.initial}</td>
-                <td style="padding: 12px; text-align: center; color: #10b981; font-weight: 600;">${data.dispatched.total}</td>
-                <td style="padding: 12px; text-align: center; color: ${remainingColor}; font-weight: ${remainingWeight};">${remaining}</td>
-                <td style="padding: 12px; text-align: center;">
-                    <button class="delete-sku-btn" data-sku="${sku}" style="background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 5px;">
+                <td data-label="SKU Name" style="padding: 12px; font-weight: 500;"><span style="color: var(--primary-color); cursor: pointer; text-decoration: underline;" onclick="showSkuHistory('${sku.replace(/'/g, "\\'")}')">${sku}</span></td>
+                <td data-label="Initial Stock" class="animate-number-inv" data-val="${data.initial}" style="padding: 12px; text-align: center;">${data.initial}</td>
+                <td data-label="Dispatched" class="animate-number-inv" data-val="${data.dispatched.total}" style="padding: 12px; text-align: center; color: var(--accent-success); font-weight: 600;">${data.dispatched.total}</td>
+                <td data-label="Remaining" class="animate-number-inv" data-val="${remaining}" style="padding: 12px; text-align: center; color: ${remainingColor}; font-weight: ${remainingWeight};">${remaining}</td>
+                <td data-label="Actions" style="padding: 12px; text-align: center;">
+                    <button class="delete-sku-btn" data-sku="${sku}" style="background: transparent; border: none; color: var(--accent-danger); cursor: pointer; padding: 5px;">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                     </button>
                 </td>
@@ -897,12 +1189,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Row for Dashboard (Compact)
             const dTr = document.createElement('tr');
-            dTr.style.borderBottom = '1px solid rgba(0,0,0,0.05)';
+            dTr.style.borderBottom = '1px solid var(--border-color)';
             dTr.innerHTML = `
                 <td style="padding: 12px; font-weight: 500; font-size: 0.9rem;"><span style="color: var(--primary-color); cursor: pointer; text-decoration: underline;" onclick="showSkuHistory('${sku.replace(/'/g, "\\'")}')">${sku}</span></td>
                 <td style="padding: 12px; text-align: right; color: ${remainingColor}; font-weight: ${remainingWeight};">${remaining}</td>
             `;
             if (dashboardInventoryTableBody) dashboardInventoryTableBody.appendChild(dTr);
+        });
+
+        document.querySelectorAll('.animate-number-inv').forEach(el => {
+            animateCountUp(el, el.getAttribute('data-val'));
+            el.classList.remove('animate-number-inv');
         });
 
         // Add delete listeners
@@ -919,24 +1216,69 @@ document.addEventListener('DOMContentLoaded', () => {
                         showToast(`Deleted ${skuToDelete} from inventory.`, "success");
                     },
                     "Delete",
-                    "#ef4444"
+                    "var(--accent-danger)"
                 );
             });
         });
     }
 
     if (addInvBtn) {
-        addInvBtn.addEventListener('click', () => {
+        addInvBtn.addEventListener('click', async () => {
             const skuName = invSkuNameInput.value.trim();
-            const skuQty = parseInt(invSkuQtyInput.value.trim());
+            const skuQtyVal = invSkuQtyInput.value.trim();
+            const skuQty = parseInt(skuQtyVal);
             const dateInput = document.getElementById('inv-sku-date');
             const skuDate = dateInput ? dateInput.value : '';
+            const errorDiv = document.getElementById('inv-sku-error');
             
-            if (!skuName || isNaN(skuQty) || skuQty < 0) {
-                showToast("Please enter a valid SKU Name and Quantity.", "error");
+            // Helper to trigger shake animation on field
+            const shakeField = (field) => {
+                if (!field) return;
+                field.classList.remove('shake-animation');
+                void field.offsetWidth;
+                field.classList.add('shake-animation');
+                setTimeout(() => field.classList.remove('shake-animation'), 500);
+            };
+
+            // Validation checks
+            let errMsg = '';
+            if (!skuName && !skuQtyVal) {
+                errMsg = 'Please enter both SKU Name and Initial Inventory.';
+                shakeField(invSkuNameInput);
+                shakeField(invSkuQtyInput);
+            } else if (!skuName) {
+                errMsg = 'SKU Name cannot be empty.';
+                shakeField(invSkuNameInput);
+            } else if (!skuQtyVal || isNaN(skuQty) || skuQty < 0) {
+                errMsg = 'Please enter a valid inventory quantity (0 or greater).';
+                shakeField(invSkuQtyInput);
+            }
+
+            if (errMsg) {
+                if (errorDiv) {
+                    errorDiv.innerHTML = `⚠️ <span>${errMsg}</span>`;
+                    errorDiv.classList.remove('hidden');
+                    errorDiv.classList.remove('fade-in-error');
+                    void errorDiv.offsetWidth;
+                    errorDiv.classList.add('fade-in-error');
+                }
                 return;
             }
-            
+
+            if (errorDiv) {
+                errorDiv.classList.add('hidden');
+            }
+
+            // 1. Show loading spinner on button and disable it
+            const originalBtnText = addInvBtn.innerHTML;
+            addInvBtn.disabled = true;
+            addInvBtn.style.opacity = '0.75';
+            addInvBtn.style.cursor = 'not-allowed';
+            addInvBtn.innerHTML = `<span style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: -2px;"></span>Adding...`;
+
+            // Simulate slight async request duration for smooth spinner feedback
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             const resolvedDate = skuDate || new Date().toISOString().split('T')[0];
 
             // If exists, just update initial stock
@@ -972,12 +1314,19 @@ document.addEventListener('DOMContentLoaded', () => {
             saveInventory();
             renderInventoryTable();
             
-            showToast(`SKU '${skuName}' added to inventory!`, "success");
+            // Restore button
+            addInvBtn.disabled = false;
+            addInvBtn.style.opacity = '1';
+            addInvBtn.style.cursor = 'pointer';
+            addInvBtn.innerHTML = originalBtnText;
+
+            // 2. Show toast notification auto-dismissing after ~3s
+            showToast("SKU added successfully ✓", "success", 3000);
             
             // Clear inputs
             invSkuNameInput.value = '';
             invSkuQtyInput.value = '';
-            if (dateInput) dateInput.value = '';
+            if (dateInput) dateInput.value = getTodayISO();
         });
     }
 
@@ -1034,8 +1383,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sortedHistory.forEach(entry => {
             const tr = document.createElement('tr');
-            tr.style.borderBottom = '1px solid rgba(0,0,0,0.05)';
-            const typeColor = entry.type === 'ADD' ? '#10b981' : '#ef4444';
+            tr.style.borderBottom = '1px solid var(--border-color)';
+            const typeColor = entry.type === 'ADD' ? 'var(--accent-success)' : 'var(--accent-danger)';
             tr.innerHTML = `
                 <td style="padding: 10px;">${entry.date}</td>
                 <td style="padding: 10px; color: ${typeColor}; font-weight: 600;">${entry.type === 'ADD' ? 'Stock In' : 'Stock Out'}</td>
@@ -1110,10 +1459,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     let remainingColor = 'var(--primary-color)'; // Default to primary color (indigo)
                     let remainingWeight = '700';
                     if (remaining <= 0) {
-                        remainingColor = '#ef4444';
+                        remainingColor = 'var(--accent-danger)';
                         remainingWeight = '700';
                     } else if (remaining < inventory[actualProductName].initial * 0.2) {
-                        remainingColor = '#f59e0b';
+                        remainingColor = 'var(--accent-warning)';
                         remainingWeight = '600';
                     }
                     
@@ -1151,17 +1500,38 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderHotSellingTable() {
         if (!hotSellingTableBody) return;
         
+        const amzEl = document.getElementById('amazon-total-metric');
+        const fkEl = document.getElementById('flipkart-total-metric');
+        const msEl = document.getElementById('meesho-total-metric');
+
+        if (isDataLoading) {
+            if (emptyHotSellingMsg) emptyHotSellingMsg.style.display = 'none';
+            if (amzEl) amzEl.innerHTML = '<div class="skeleton-loader" style="height: 24px; width: 40px; margin: 0 auto; border-radius: 4px;"></div>';
+            if (fkEl) fkEl.innerHTML = '<div class="skeleton-loader" style="height: 24px; width: 40px; margin: 0 auto; border-radius: 4px;"></div>';
+            if (msEl) msEl.innerHTML = '<div class="skeleton-loader" style="height: 24px; width: 40px; margin: 0 auto; border-radius: 4px;"></div>';
+            
+            const hotSkeletonRow = `
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 12px; text-align: center;"><div class="skeleton-loader" style="height: 16px; width: 16px; border-radius: 4px; margin: 0 auto;"></div></td>
+                    <td style="padding: 12px;"><div class="skeleton-loader" style="height: 16px; width: 60%; border-radius: 4px;"></div></td>
+                    <td style="padding: 12px; text-align: center;"><div class="skeleton-loader" style="height: 16px; width: 30px; border-radius: 4px; margin: 0 auto;"></div></td>
+                    <td style="padding: 12px; text-align: center;"><div class="skeleton-loader" style="height: 16px; width: 30px; border-radius: 4px; margin: 0 auto;"></div></td>
+                    <td style="padding: 12px; text-align: center;"><div class="skeleton-loader" style="height: 16px; width: 30px; border-radius: 4px; margin: 0 auto;"></div></td>
+                    <td style="padding: 12px; text-align: center;"><div class="skeleton-loader" style="height: 16px; width: 30px; border-radius: 4px; margin: 0 auto;"></div></td>
+                </tr>
+            `;
+            hotSellingTableBody.innerHTML = hotSkeletonRow.repeat(5);
+            return;
+        }
+
         // Calculate and update top metrics using globalPerformance
         let totalAmazon = globalPerformance.amazon || 0;
         let totalFlipkart = globalPerformance.flipkart || 0;
         let totalMeesho = globalPerformance.meesho || 0;
         
-        const amzEl = document.getElementById('amazon-total-metric');
-        const fkEl = document.getElementById('flipkart-total-metric');
-        const msEl = document.getElementById('meesho-total-metric');
-        if (amzEl) amzEl.innerText = totalAmazon;
-        if (fkEl) fkEl.innerText = totalFlipkart;
-        if (msEl) msEl.innerText = totalMeesho;
+        if (amzEl) animateCountUp(amzEl, totalAmazon);
+        if (fkEl) animateCountUp(fkEl, totalFlipkart);
+        if (msEl) animateCountUp(msEl, totalMeesho);
 
         // Convert inventory object to array and sort by dispatched.total descending
         const sortedSkus = Object.entries(inventory)
@@ -1180,18 +1550,23 @@ document.addEventListener('DOMContentLoaded', () => {
         sortedSkus.forEach(([sku, data], index) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="text-align: center; font-weight: 600;">
+                <td data-label="#" style="text-align: center; font-weight: 600;">
                     ${index + 1}
                 </td>
-                <td style="font-weight: 500; word-break: break-word;">
+                <td data-label="SKU Name" style="font-weight: 500; word-break: break-word;">
                     ${sku}
                 </td>
-                <td style="text-align: center; font-weight: 700; color: var(--primary-color);">${data.dispatched.total}</td>
-                <td style="text-align: center;">${data.dispatched.amazon}</td>
-                <td style="text-align: center;">${data.dispatched.flipkart}</td>
-                <td style="text-align: center;">${data.dispatched.meesho}</td>
+                <td data-label="Orders" class="animate-number" data-val="${data.dispatched.total}" style="text-align: center; font-weight: 700; color: var(--primary-color);">0</td>
+                <td data-label="Amazon" class="animate-number" data-val="${data.dispatched.amazon}" style="text-align: center; color: ${data.dispatched.amazon > 0 ? 'var(--brand-amazon)' : 'var(--text-muted)'}; font-weight: ${data.dispatched.amazon > 0 ? '600' : 'normal'};">0</td>
+                <td data-label="Flipkart" class="animate-number" data-val="${data.dispatched.flipkart}" style="text-align: center; color: ${data.dispatched.flipkart > 0 ? 'var(--brand-flipkart)' : 'var(--text-muted)'}; font-weight: ${data.dispatched.flipkart > 0 ? '600' : 'normal'};">0</td>
+                <td data-label="Meesho" class="animate-number" data-val="${data.dispatched.meesho}" style="text-align: center; color: ${data.dispatched.meesho > 0 ? 'var(--brand-meesho)' : 'var(--text-muted)'}; font-weight: ${data.dispatched.meesho > 0 ? '600' : 'normal'};">0</td>
             `;
             hotSellingTableBody.appendChild(tr);
+        });
+
+        document.querySelectorAll('.animate-number').forEach(el => {
+            animateCountUp(el, el.getAttribute('data-val'));
+            el.classList.remove('animate-number');
         });
     }
 
@@ -1215,6 +1590,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             sideLinks.forEach(l => l.classList.remove('active'));
             e.currentTarget.classList.add('active');
+            if (typeof window.updateNavIndicator === 'function') window.updateNavIndicator(true);
             // Get all possible dashboards
             const dashboards = document.querySelectorAll('.app-wrapper');
             
@@ -1256,7 +1632,57 @@ document.addEventListener('DOMContentLoaded', () => {
                 const d = document.getElementById('terms-dashboard');
                 if (d) d.classList.remove('hidden');
             }
-            toggleSidePanel(); // Close drawer
+            if (typeof setupScrollReveal === 'function') setupScrollReveal();
+            closeSidePanel(); // Close drawer if open
+        });
+    });
+    // Allow privacy and terms links on auth screen to open their dashboards
+    const authFooterLinks = document.querySelectorAll('a[href="#privacy"], a[href="#terms"]');
+    authFooterLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            const target = e.currentTarget.getAttribute('href');
+            const authContainer = document.getElementById('auth-container');
+            
+            // Only do this special logic if we are on the auth screen
+            if (authContainer && !authContainer.classList.contains('hidden')) {
+                e.preventDefault();
+                authContainer.classList.add('hidden');
+                
+                const navbar = document.querySelector('.navbar');
+                if (navbar) {
+                    navbar.classList.remove('hidden');
+                    const toggleBtn = document.getElementById('sidebar-toggle');
+                    if(toggleBtn) toggleBtn.style.display = 'none'; // hide sidebar on auth view
+                    
+                    // Add a temporary back button if not exists
+                    if(!document.getElementById('auth-back-btn')) {
+                        const backBtn = document.createElement('button');
+                        backBtn.id = 'auth-back-btn';
+                        backBtn.className = 'btn secondary-btn';
+                        backBtn.innerHTML = '← Back to Login';
+                        backBtn.style.marginRight = '15px';
+                        backBtn.onclick = () => {
+                            backBtn.style.display = 'none';
+                            document.querySelectorAll('.app-wrapper').forEach(d => { if(d) d.classList.add('hidden'); });
+                            authContainer.classList.remove('hidden');
+                            navbar.classList.add('hidden');
+                            window.history.pushState(null, '', window.location.pathname);
+                        };
+                        navbar.querySelector('.navbar-right').prepend(backBtn);
+                    } else {
+                        document.getElementById('auth-back-btn').style.display = 'inline-block';
+                    }
+                }
+                
+                document.querySelectorAll('.app-wrapper').forEach(d => { if(d) d.classList.add('hidden'); });
+                if (target === '#privacy') {
+                    const d = document.getElementById('privacy-dashboard');
+                    if (d) d.classList.remove('hidden');
+                } else if (target === '#terms') {
+                    const d = document.getElementById('terms-dashboard');
+                    if (d) d.classList.remove('hidden');
+                }
+            }
         });
     });
 
@@ -1275,8 +1701,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const transferSenderEmail = document.getElementById('transfer-sender-email');
     let pendingTransferData = null;
 
+    window.toggleDangerZone = function() {
+        const content = document.getElementById('danger-zone-content');
+        const chevron = document.getElementById('danger-zone-chevron');
+        if (!content) return;
+        const isExpanded = content.getAttribute('data-expanded') === 'true';
+        if (isExpanded) {
+            content.setAttribute('data-expanded', 'false');
+            content.style.maxHeight = '0';
+            content.style.opacity = '0';
+            content.style.paddingTop = '0';
+            content.style.paddingBottom = '0';
+            content.style.pointerEvents = 'none';
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        } else {
+            content.setAttribute('data-expanded', 'true');
+            content.style.maxHeight = '650px';
+            content.style.opacity = '1';
+            content.style.paddingTop = '25px';
+            content.style.paddingBottom = '25px';
+            content.style.pointerEvents = 'auto';
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+        }
+    };
+
     window.openTransferModal = function() {
-        toggleSidePanel(); // close sidebar
+        closeSidePanel(); // close sidebar if open
         transferEmail.value = '';
         transferError.classList.add('hidden');
         transferModalOverlay.classList.remove('hidden');
@@ -1311,8 +1761,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         transferError.classList.add('hidden');
-        transferConfirmBtn.innerText = "Verifying email...";
+        transferConfirmBtn.innerHTML = `<span style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: -2px;"></span>Verifying...`;
         transferConfirmBtn.disabled = true;
+        transferConfirmBtn.style.opacity = '0.8';
+        transferConfirmBtn.style.cursor = 'not-allowed';
 
         try {
             // Check for disposable email
@@ -1323,7 +1775,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            transferConfirmBtn.innerText = "Processing...";
+            transferConfirmBtn.innerHTML = `<span style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: -2px;"></span>Processing...`;
 
             // Generate payload
             const payload = {
@@ -1374,7 +1826,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Initialize API Call (relative URL for Vercel Serverless Function)
-            transferConfirmBtn.innerText = "Sending email...";
+            transferConfirmBtn.innerHTML = `<span style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: -2px;"></span>Sending email...`;
             
             const response = await fetch('/api/send-transfer', {
                 method: 'POST',
@@ -1400,6 +1852,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.createNotification(currentUserEmail, "Transfer Sent", `Your data transfer to ${targetEmail} is pending.`, "general", transferId);
             }
             
+            transferConfirmBtn.innerHTML = `<span style="display: inline-block; margin-right: 6px; font-size: 1.1rem;">✅</span>Sent Successfully!`;
+            transferConfirmBtn.style.background = '#10b981';
+            await new Promise(resolve => setTimeout(resolve, 800));
+            transferConfirmBtn.style.background = '';
+
             closeTransferModal();
             showToast(`A secure transfer link has been emailed to <strong>${targetEmail}</strong>.<br><br>They need to open the link to accept the data.`, "success");
         } catch (error) {
@@ -1408,8 +1865,10 @@ document.addEventListener('DOMContentLoaded', () => {
             transferError.innerText = "❌ Error: " + msg;
             transferError.classList.remove('hidden');
         } finally {
-            transferConfirmBtn.innerText = "Send Transfer Link";
+            transferConfirmBtn.innerHTML = "Send Transfer Link";
             transferConfirmBtn.disabled = false;
+            transferConfirmBtn.style.opacity = '1';
+            transferConfirmBtn.style.cursor = 'pointer';
         }
     });
 
@@ -1648,7 +2107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
             "Yes, Clear Data",
-            "#f59e0b" // Orange warning color
+            "var(--accent-warning)" // Orange warning color
         );
     };
 });
@@ -1666,4 +2125,49 @@ document.addEventListener('DOMContentLoaded', () => {
             border: 0.18
         });
     }
+    setupScrollReveal();
 });
+
+// --- Landing / Marketing Page Scroll Reveal & Count-Up ---
+function animateStatCountUp(el, start, end, duration) {
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        const easeProgress = 1 - Math.pow(1 - progress, 4);
+        const currentVal = Math.floor(easeProgress * (end - start) + start);
+        el.innerText = currentVal.toLocaleString('en-US');
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        } else {
+            el.innerText = end.toLocaleString('en-US');
+        }
+    };
+    window.requestAnimationFrame(step);
+}
+
+function setupScrollReveal() {
+    const revealElements = document.querySelectorAll('.scroll-reveal, .scroll-count-up');
+    if (!revealElements.length) return;
+
+    const observer = new IntersectionObserver((entries, obs) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                if (entry.target.classList.contains('scroll-reveal')) {
+                    entry.target.classList.add('revealed');
+                }
+                if (entry.target.classList.contains('scroll-count-up') && !entry.target.dataset.counted) {
+                    entry.target.dataset.counted = "true";
+                    const targetVal = parseInt(entry.target.getAttribute('data-target') || "10000", 10);
+                    animateStatCountUp(entry.target, 0, targetVal, 800);
+                }
+                obs.unobserve(entry.target);
+            }
+        });
+    }, {
+        threshold: 0.15,
+        rootMargin: "0px 0px -10px 0px"
+    });
+
+    revealElements.forEach(el => observer.observe(el));
+}
